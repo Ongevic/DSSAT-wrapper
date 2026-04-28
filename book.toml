@@ -1,0 +1,9 @@
+[book]
+title = "DSSAT-wrapper Guide"
+authors = ["Maintainers"]
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "light"
+preferred-dark-theme = "navy"

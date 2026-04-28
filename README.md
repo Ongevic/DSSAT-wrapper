@@ -1,54 +1,166 @@
 # DSSAT-wrapper
 
-This repository aims to provide a DSSAT wrapper for the [CroptimizR](https://sticsrpacks.github.io/CroptimizR/) and [CroPlotR](https://sticsrpacks.github.io/CroPlotR/) packages.
-It makes it possible to apply to the models implemented in DSSAT the calibration and evaluation methods these packages include.
+`DSSAT-wrapper` is a public R wrapper project for running DSSAT experiments in a
+more reproducible and more extensible way.
 
-This wrapper is an evolution of the one created for AgMIP Calibration Phase III protocol (see [Wallach et al., 2022](https://www.biorxiv.org/content/biorxiv/early/2022/08/29/2022.06.08.495355.full.pdf)). This new version of the DSSAT wrapper aims to be more generic and efficient than the first version. It makes it possible to work with any type of variable observations provided in the time series file \*.\*\*T, with any parameter among cultivar and/or ecotype ones, and with multiple experiment files and treatments.
+This fork preserves the original `DSSAT_wrapper()` associated with the AgMIP
+Calibration Phase III workflow and adds a cleaner, registry-driven
+`DSSAT_omniwrapper()` for multi-family DSSAT support.
 
-## What does it require?
+It is best described as a practical implementation that builds on the original
+AgMIP wrapper direction while extending it for broader DSSAT family coverage and
+reproducible wrapper workflows.
 
-To apply to DSSAT the calibration and evaluation methods implemented in CroptimizR and CroPlotR, you must:
+## What this fork adds
 
-* have DSSAT installed (see https://dssat.net/), 
-* have several R packages installed (the [DSSAT R package](https://cran.r-project.org/web/packages/DSSAT/index.html), the [CroptimizR](https://sticsrpacks.github.io/CroptimizR/) and [CroPlotR](https://sticsrpacks.github.io/CroPlotR/) packages, and a few other packages the DSSAT wrapper depends on). The example scripts provided in this repos. include instructions that automatically install these R packages if they are not yet installed.
+- a public `DSSAT_omniwrapper()` entry point
+- modular internals for registry discovery, run staging, and output parsing
+- broader cross-family validation
+- support for alternate engines such as `MZIXM048`, `WHAPS048`, `TFAPS048`,
+  `SUOIL048`, `SCCSP048`, and `SCSAM048`
+- observation reading from either installed DSSAT crop folders or external
+  project directories
+- a focused `mdBook` guide for setup, validation, and contribution
 
-## What does this repos. contain?
+## Current validated families
 
-* DSSAT-wrapper.Rproj, the R project associated to this repos. 
-* R folder: 
+Validated through `DSSAT_omniwrapper()`:
 
-  * DSSAT_wrapper.R: the DSSAT wrapper function,
-  * read_obs.R: a function that reads DSSAT observation files (both times series \*.\*\*T files, and end-of-season \*.\*\*A files) and returns them in CroptimizR/CroPlotR format,
-  * test_read_obs.R: a little script to show how to use the read_obs function,
-  * test_DSSAT_wrapper.R: a script for testing the DSSAT wrapper,
-  * test_calibration_synthetic.R: a script showing a simple example of calibration of a model included in DSSAT (CERES-WHEAT), using synthetic data,
-  * test_calibration_real.R: a script showing a simple example of calibration of a model included in DSSAT (CERES-WHEAT), using real data.
-  
-You will find comments at the beginning of each function and script file.   
-  
-## How to proceed?
+- `ALOHA`
+- `AROIDS`
+- `CANEGRO`
+- `CASUPRO`
+- `CERES`
+- `CERES-IXIM`
+- `CROPGRO`
+- `CROPSIM`
+- `CSYCA`
+- `NWHEAT`
+- `OILCROP`
+- `SAMUCA`
+- `SUBSTOR`
 
-* First, install DSSAT if you haven't already (see https://get.dssat.net/request/?sft=4),
-* Then, install the DSSAT R Package if you haven't already (just by running `install.packages("DSSAT")` in R/Rstudio),
-* Then, install [CroptimizR](https://sticsrpacks.github.io/CroptimizR/) and [CroPlotR](https://sticsrpacks.github.io/CroPlotR/) (see section [What does it require?](#What-does-it-require?)), if you haven't already,
-* Then, download (or clone/fork) this repository (green button "Code"),
-* Open the DSSAT-wrapper.Rproj in RStudio, or, if you do not want to use RStudio, go, in R, to the main folder of your local copy of the repository,
-* The test_***.R scripts provided use by default DSSAT version 4.8, installed in C: drive, and the input files provided with it. If you have a different version of DSSAT or installed DSSAT in a different folder, you must modify the associated information in these scripts before running them.
-* Just play by running the scripts and adapting them to your own case!
+Known blocker:
 
-You will find a comprehensive documentation on the methods and features available for the calibration and evaluation of all crop models in [CroptimizR](https://sticsrpacks.github.io/CroptimizR/) and [CroPlotR](https://sticsrpacks.github.io/CroPlotR/) websites.
+- `CSCAS` currently launches through the wrapper but still stops inside DSSAT
+  with an ecotype-related model or data issue in the tested setup.
 
-## Special features of the DSSAT wrapper
+Next unresolved family:
 
-* The names of the simulated situations are set to EXPERIMENT_TRNO, where EXPERIMENT is the experiment name, and TRNO the treatment number. These names are used in the results returned by the wrapper to associate simulated results to the corresponding situation, and are also useful to specify the list of situations to simulate, using the "situation" argument of the wrapper.
-* This wrapper generates additional variables wrt to what is read in DSSAT OUT files. The julian day, from 1st jan. of sowing year, of each Zadok stage is given in Zadok1 to Zadok100 variables, as interpolated from GSTD variable. If the corresponding Zadok stage is not reached, the value is set to the last day of the last simulated year. These variables are useful to estimate parameters from observed julian days of phenological stages.
+- `FORAGE`
 
-More details about the wrapper inputs and outputs are provided as comments at the beginning of the R/DSSAT_wrapper.R file.
+## What this repository does not include
 
-## Getting help
+- a bundled DSSAT installation
+- bundled DSSAT source code
+- bundled `dssat-csm-data`
+- bundled experiment outputs from one private machine
 
-If you have any question or suggestion or if you want to report a bug, please do it via the GitHub [issues](https://github.com/sbuis/DSSAT-wrapper/issues).
+To use the wrapper, you should provide your own DSSAT installation and, when
+needed, your own clone or download of public experiment data such as
+`dssat-csm-data`.
 
-## Citation 
+## Quick start
 
-If you have used the CroptimizR/CroPlotR packages for a study that led to a publication or report, please cite the authors. To get the suggested citation, run `citation("CroptimizR")` and `citation("CroPlotR")` in R.
+Install the main R dependencies:
+
+```r
+install.packages(c("DSSAT", "dplyr", "tidyr", "lubridate"))
+```
+
+Source the omniwrapper from the repository root:
+
+```r
+source("R/DSSAT_omniwrapper.R")
+```
+
+Example with an installed DSSAT folder:
+
+```r
+result <- DSSAT_omniwrapper(
+  model_options = list(
+    DSSAT_path = "C:/path/to/DSSAT48",
+    DSSAT_exe = "DSCSM048.EXE",
+    project_file = "C:/path/to/DSSAT48/Wheat/KSAS8101.WHX",
+    suppress_output = TRUE
+  ),
+  situation = "KSAS8101_1",
+  var = "GSTD"
+)
+```
+
+Example with external example data:
+
+```r
+result <- DSSAT_omniwrapper(
+  model_options = list(
+    DSSAT_path = "C:/path/to/DSSAT48",
+    DSSAT_exe = "DSCSM048.EXE",
+    Crop = "Maize",
+    project_file = "C:/path/to/dssat-csm-data/Maize/UFGA8201.MZX",
+    module_code = "MZIXM048",
+    suppress_output = TRUE
+  ),
+  situation = "UFGA8201_1",
+  var = "CWAD"
+)
+```
+
+## Validation scripts
+
+These scripts are included so users can verify their own setup:
+
+- `R/test_DSSAT_omniwrapper.R`
+- `R/test_DSSAT_omni_read_obs.R`
+- `R/validate_DSSAT_omniwrapper_families.R`
+
+They use:
+
+- `DSSAT_PATH` for the local DSSAT installation
+- `DSSAT_CSM_DATA` for an optional clone of `dssat-csm-data`
+
+If `DSSAT_PATH` is not set, the scripts try the common Windows default
+`C:/DSSAT48`.
+
+## Documentation
+
+The repository includes a focused `mdBook` in `src/`, covering:
+
+- repository structure
+- DSSAT file anatomy
+- setup from an installed DSSAT folder
+- setup with GitHub-sourced example data
+- first runs and self-checks
+- wrapper design and code walkthroughs
+- supported families
+- a hemp paper case study
+- troubleshooting and extension guidance
+
+If GitHub Pages is enabled for the repository, the book can be published from
+the included workflow.
+
+## Attribution
+
+This fork builds on the original DSSAT wrapper work associated with the AgMIP
+Calibration Phase III effort.
+
+The header of the original wrapper credits:
+
+- Jing Qi
+- Amir Souissi
+- Samuel Buis
+- Vakhtang Shelia
+
+This fork preserves that lineage while adding the omniwrapper architecture,
+broader family validation, and public-facing documentation.
+
+## License and disclaimer
+
+At the time of writing, the checked upstream wrapper snapshot used for this fork
+does not include an explicit `LICENSE` file. For that reason, this repository
+keeps attribution clear and avoids claiming license terms that are not stated in
+the upstream snapshot.
+
+This work is shared in good faith for research and educational use, but it is
+provided as-is without warranty, and users are responsible for checking whether
+it fits their own workflows, data, and redistribution needs.
