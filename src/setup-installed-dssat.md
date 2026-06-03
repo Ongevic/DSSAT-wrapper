@@ -1,40 +1,50 @@
 # Installed DSSAT Setup
 
-Use this path when DSSAT is already installed locally.
+Start here if DSSAT is already installed on your computer. This page gets your
+environment ready and confirms the wrapper can see DSSAT. The actual run is on
+the next page, *Your First Run*.
 
-## Requirements
+## 1. What you need
 
-- a local DSSAT installation
-- R
-- required R packages:
-  - `DSSAT`
-  - `dplyr`
-  - `tidyr`
-  - `lubridate`
+- A **local DSSAT installation** — on Windows this is a folder such as
+  `C:\DSSAT48` containing `DSCSM048.EXE` and crop folders (`Wheat`, `Maize`, …).
+- **R** (4.1 or newer).
+- These R packages (install once):
 
-Install packages if needed:
+  ```r
+  install.packages(c("DSSAT", "dplyr", "tidyr", "lubridate", "DBI", "RSQLite"))
+  ```
 
-```r
-install.packages(c("DSSAT", "dplyr", "tidyr", "lubridate"))
-```
+## 2. Load the wrapper
 
-## Source the wrapper
+You source **one** file; it loads the rest:
 
 ```r
 source("R/DSSAT_omniwrapper.R")
 ```
 
-## Minimal example
+Use a full path if you are not in the repository folder, e.g.
+`source("C:/Users/you/DSSAT-wrapper/R/DSSAT_omniwrapper.R")`.
+
+## 3. Confirm DSSAT is found (before running anything)
+
+Run the self-check. It does **not** simulate — it just verifies the executable,
+genotype files, experiment, situation and variable all exist, so you catch setup
+problems early:
 
 ```r
-result <- DSSAT_omniwrapper(
+chk <- DSSAT_omni_self_check(
   model_options = list(
-    DSSAT_path = "C:/path/to/DSSAT48",
-    DSSAT_exe = "DSCSM048.EXE",
-    project_file = "C:/path/to/DSSAT48/Wheat/KSAS8101.WHX",
-    suppress_output = TRUE
+    DSSAT_path   = "C:/DSSAT48",
+    DSSAT_exe    = "DSCSM048.EXE",
+    project_file = "C:/DSSAT48/Wheat/KSAS8101.WHX"
   ),
-  situation = "KSAS8101_1",
-  var = "GSTD"
+  situation    = "KSAS8101_1",
+  required_var = "GSTD"
 )
+chk$ok      # TRUE means you are ready
+chk$checks  # a table showing each item and whether it was found
 ```
+
+If `chk$ok` is `TRUE`, continue to **[Your First Run](first-run.md)**. If not,
+the `chk$checks` table names exactly which file or setting is missing.
