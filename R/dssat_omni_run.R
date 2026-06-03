@@ -1,3 +1,18 @@
+# ===========================================================================
+# dssat_omni_run.R  —  RUN STAGE  (see ARCHITECTURE.md)
+# Author: Victor Nyabuti Ong'era
+#
+# This file holds the PUBLIC entry point and the run orchestration:
+#   - DSSAT_omniwrapper() : the function users call. It (1) resolves the model
+#       via dssat_infer_model_options() [registry.R], (2) self-checks inputs,
+#       (3) runs DSSAT, (4) parses outputs [outputs.R], and returns
+#       list(sim_list = <data by situation>, error = <logical>).
+#   - the helpers below create an isolated run directory, copy in the
+#       experiment + genotype + companion files (incl. forage .MOW/.HAR),
+#       invoke DSCSM048.EXE, then hand the run dir to the output parser.
+# Keep this file about *orchestration*; model choice lives in registry.R and
+# output parsing lives in outputs.R.
+# ===========================================================================
 DSSAT_omniwrapper <- function(param_values = NULL, situation = NULL, model_options, var = NULL, ...) {
   model_options <- dssat_infer_model_options(model_options)
   preflight <- DSSAT_omni_self_check(model_options, situation = situation, required_var = var)
@@ -163,6 +178,19 @@ DSSAT_omniwrapper <- function(param_values = NULL, situation = NULL, model_optio
     }
   }
 
+  # FORAGE (PRFRM) models require companion management files named after the
+  # experiment stem — chiefly the mowing/harvest file (.MOW). Stage any such
+  # companions like FILEA/FILET. Purely additive: only copies if present, so it
+  # has no effect on non-forage families.
+  exp_stem <- tools::file_path_sans_ext(project_file)
+  for (comp_ext in c("MOW", "HAR")) {
+    comp_name <- paste0(exp_stem, ".", comp_ext)
+    comp_src <- file.path(project_source_dir, comp_name)
+    if (file.exists(comp_src)) {
+      file.copy(comp_src, file.path(run_dir, comp_name), overwrite = TRUE)
+    }
+  }
+
   setwd(run_dir)
   write_dssbatch(x = project_file, trtno = trt_numbers)
   run_status <- dssat_run_model(
@@ -194,6 +222,9 @@ DSSAT_omniwrapper <- function(param_values = NULL, situation = NULL, model_optio
   out
 }
 
+# Read the OBSERVED data for a situation from the experiment's companion files
+# (FILEA = end-of-season summary, FILET = in-season time series), returning it
+# in the same tidy shape as the simulated output so the two can be compared.
 DSSAT_omni_read_obs <- function(model_options, situation, read_end_season = FALSE) {
   model_options <- dssat_infer_model_options(model_options)
   obs_file_path <- function(experiment, suffix) {

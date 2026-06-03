@@ -1,6 +1,31 @@
-# Registry-driven DSSAT omniwrapper prototype
-# This prototype is designed to extend the original DSSAT_wrapper toward
-# multiple DSSAT model families using runtime inference from installed files.
+# ===========================================================================
+# dssat_omni_registry.R  —  RESOLVE STAGE
+# Author: Victor Nyabuti Ong'era
+#
+# WHAT THIS FILE DOES (see ARCHITECTURE.md for the big picture):
+#   Given a crop/experiment, it works out (a) which DSSAT model family to use,
+#   (b) which output adapter parses the results, and (c) where the genotype and
+#   companion files live. It infers all of this from the installed DSSAT files
+#   (DSSATPRO.V48, SIMULATION.CDE, the experiment header) so callers usually do
+#   not have to name a model.
+#
+# THE TWO THINGS A USER MOST OFTEN CHANGES:
+#   1. dssat_omni_family_map()  -> add a row to support a NEW model family.
+#   2. (for your own data) point model_options$DSSAT_path at your DSSAT install
+#      and model_options$project_file at your experiment (.??X) file.
+#
+# Function map (top to bottom):
+#   dssat_omni_family_map            the model-code -> adapter lookup table
+#   dssat_normalize_windows_profile_path / dssat_extract_profile_value  helpers
+#   dssat_read_simulation_registry   read DSSATPRO.V48 + SIMULATION.CDE
+#   dssat_parse_experiment_header    read crop/model info from a .??X file
+#   dssat_try_match_row              small fuzzy-match helper
+#   dssat_run_model                  call the DSSAT executable
+#   dssat_parse_plantgro_fallback / dssat_read_output_safe   robust OUT reading
+#   dssat_infer_model_options        THE resolver (model + crop + adapter)
+#   dssat_companion_paths            locate FILEA/FILET/.MOW companions
+#   DSSAT_omni_self_check            pre-run check that all inputs exist
+# ===========================================================================
 
 suppressPackageStartupMessages({
   required_packages <- c("DSSAT", "dplyr", "tidyr", "lubridate")
@@ -19,6 +44,22 @@ suppressPackageStartupMessages({
   library("lubridate")
 })
 
+# --------------------------------------------------------------------------
+# THE FAMILY MAP  (the table you edit to add crops/families)
+#
+# Each entry is:  <5-char DSSAT model code> = list(adapter = "<adapter name>",
+#                                                   outputs = c(<OUT files to read>))
+# - The model code is the first 5 characters of a DSSAT module (e.g. "MZCER"
+#   from MZCER048). Find a crop's module in the install's DSSATPRO.V48.
+# - The adapter name tells the PARSE stage (outputs.R) which column aliases to
+#   use for that family.
+#
+# ALL DSSAT 4.8 CROP FAMILIES ARE ALREADY LISTED BELOW (CERES, CROPGRO, FORAGE,
+# SUGARCANE, RICE, SUBSTOR, ALOHA, AROIDS, CSYCA, CSCAS, NWHEAT, OILCROP,
+# CROPSIM). TO ADD A NEW / CUSTOM FAMILY: copy any line and change the model
+# code + adapter. If the new family needs different output columns, also add a
+# branch in dssat_variable_alias_map() in dssat_omni_outputs.R.
+# --------------------------------------------------------------------------
 dssat_omni_family_map <- function() {
   list(
     BSCER = list(adapter = "CERES", outputs = c("PlantGro.OUT", "Evaluate.OUT")),
@@ -48,6 +89,8 @@ dssat_omni_family_map <- function() {
   )
 }
 
+# Helper: turn a path fragment from DSSATPRO.V48 into a real absolute path
+# (handles Windows backslashes and a leading drive-root duplicate).
 dssat_normalize_windows_profile_path <- function(root_path, profile_fragment) {
   fragment <- gsub("/", "\\\\", trimws(profile_fragment))
   fragment <- gsub("^\\\\+", "", fragment)
@@ -59,11 +102,16 @@ dssat_normalize_windows_profile_path <- function(root_path, profile_fragment) {
   normalizePath(file.path(root_path, if (nzchar(fragment)) fragment else "."), winslash = "/", mustWork = FALSE)
 }
 
+# Helper: strip the 3-char code + key prefix off a DSSATPRO.V48 line,
+# returning just the value (path or filename).
 dssat_extract_profile_value <- function(line) {
   value <- sub("^[A-Z0-9]{3}\\s+[A-Z]:\\s*", "", trimws(line))
   trimws(value)
 }
 
+# Build the crop/model registry by reading the DSSAT install's own files:
+# DSSATPRO.V48 (crop code -> module + genotype dir) and SIMULATION.CDE.
+# This is the authoritative crop->model source that powers auto-detection.
 dssat_read_simulation_registry <- function(dssat_path) {
   sim_file <- file.path(dssat_path, "SIMULATION.CDE")
   profile_file <- file.path(dssat_path, "DSSATPRO.V48")
@@ -164,6 +212,9 @@ dssat_read_simulation_registry <- function(dssat_path) {
   registry
 }
 
+# Read the top of a DSSAT experiment file (.??X) to extract crop code, the
+# companion FILEA/FILET names, the treatment list, and the SMODEL field (which
+# may be blank — the resolver only trusts it if it is a known family).
 dssat_parse_experiment_header <- function(filex_path) {
   lines <- readLines(filex_path, warn = FALSE, encoding = "UTF-8")
   section <- NULL
@@ -218,6 +269,8 @@ dssat_parse_experiment_header <- function(filex_path) {
   )
 }
 
+# Small helper: return the first candidate column value that matches `target`
+# in data frame `df` (used for tolerant lookups).
 dssat_try_match_row <- function(df, target, candidates) {
   for (col in candidates) {
     if (col %in% names(df)) {
@@ -230,14 +283,9 @@ dssat_try_match_row <- function(df, target, candidates) {
   NULL
 }
 
-dssat_get_adapter_spec <- function(model_code) {
-  spec <- dssat_omni_family_map()[[model_code]]
-  if (is.null(spec)) {
-    spec <- list(adapter = "UNKNOWN", outputs = c("PlantGro.OUT", "Evaluate.OUT"))
-  }
-  spec
-}
-
+# Invoke the DSSAT executable (DSCSM048.EXE) in batch mode inside run_dir.
+# Returns the process status; a non-zero status usually means a DSSAT-side
+# error (see ERROR.OUT / WARNING.OUT in the run directory).
 dssat_run_model <- function(run_dir, model_options) {
   exe_path <- file.path(model_options$DSSAT_path, model_options$DSSAT_exe)
   if (!file.exists(exe_path)) {
@@ -263,6 +311,8 @@ dssat_run_model <- function(run_dir, model_options) {
   invisible(status)
 }
 
+# Manual fixed-width parser for PlantGro.OUT, used when the DSSAT package's
+# reader cannot (older/odd formats). Returns a data frame of the daily output.
 dssat_parse_plantgro_fallback <- function(path) {
   lines <- readLines(path, warn = FALSE, encoding = "UTF-8")
   header_idx <- grep("^@YEAR\\s+DOY", lines)
@@ -334,6 +384,8 @@ dssat_parse_plantgro_fallback <- function(path) {
   dplyr::bind_rows(blocks)
 }
 
+# Read a DSSAT .OUT file robustly: try the DSSAT package reader first, then
+# fall back to the manual parser above. Never errors out the whole run.
 dssat_read_output_safe <- function(path, output_name = basename(path)) {
   tryCatch(
     as.data.frame(read_output(path)),
@@ -347,6 +399,30 @@ dssat_read_output_safe <- function(path, output_name = basename(path)) {
   )
 }
 
+# ---------------------------------------------------------------------------
+# HOW MODEL RESOLUTION WORKS
+#
+# Goal: given what the caller supplied, decide three things — which DSSAT crop
+# (`Crop` = folder), which crop code (2-letter), and which model code (5-char,
+# e.g. CRGRO, MZCER, PRFRM) — then look the model code up in the family map to
+# pick the output adapter.
+#
+# Resolution order (first usable source wins):
+#   1. module_code (if the caller passed one)      -> model_code = first 5 chars
+#   2. experiment header SMODEL                     -> ONLY if it is a registered
+#        family code; blank/garbled SMODEL tokens are ignored on purpose so they
+#        cannot override the authoritative default below.
+#   3. crop_code -> default module from DSSATPRO.V48 (the DSSAT install's own
+#        crop->module map, read by dssat_read_simulation_registry()). This is the
+#        authoritative fallback and is what makes auto-detection work for almost
+#        every crop without the caller naming a module.
+#   4. ecotype filename stem (last-resort inference).
+#
+# The Crop (folder) is resolved in parallel from the registry so companion files
+# and genotype files can be located. Everything funnels into a single registry
+# lookup at the end; if the resolved model code is not registered, we stop with a
+# clear error rather than running the wrong model.
+# ---------------------------------------------------------------------------
 dssat_infer_model_options <- function(model_options) {
   if (is.null(model_options$DSSAT_path)) {
     stop("model_options$DSSAT_path is required.")
@@ -380,8 +456,17 @@ dssat_infer_model_options <- function(model_options) {
     model_options$filea <- exp_info$filea
     model_options$filet <- exp_info$filet
     model_options$available_treatments <- exp_info$treatments
+    # Only trust a model code parsed from the experiment header if it is a real,
+    # registered family code. Many experiment files leave SMODEL blank (DSSAT then
+    # uses the crop's default module), in which case the header parse can return a
+    # stray token (e.g. "CONTR"). Accepting that would override the authoritative
+    # crop_code -> default-module resolution below (driven by DSSATPRO.V48) and
+    # break auto-detection. Guarding it lets the DSSATPRO default win.
     if (!is.null(exp_info$model_code) && nzchar(exp_info$model_code)) {
-      model_options$model_code <- exp_info$model_code
+      header_model5 <- toupper(substr(exp_info$model_code, 1, 5))
+      if (header_model5 %in% names(dssat_omni_family_map())) {
+        model_options$model_code <- exp_info$model_code
+      }
     }
     if (is.null(model_options$Crop)) {
       crop_dir_name <- basename(dirname(normalizePath(model_options$project_file, winslash = "/", mustWork = TRUE)))
@@ -485,6 +570,9 @@ dssat_infer_model_options <- function(model_options) {
   model_options
 }
 
+# Work out the full paths of the companion files an experiment needs
+# (FILEA = observed summary, FILET = observed time-series) so the run stage
+# can copy them next to the experiment.
 dssat_companion_paths <- function(model_options) {
   if (is.null(model_options$project_file)) {
     stop("model_options$project_file is required.")
@@ -518,6 +606,9 @@ dssat_companion_paths <- function(model_options) {
   paths
 }
 
+# Pre-run sanity check: confirm the executable, genotype files, project file,
+# requested situation and variable all exist BEFORE running DSSAT, returning a
+# tidy table of what passed/failed. Run it standalone to debug setup problems.
 DSSAT_omni_self_check <- function(model_options, situation = NULL, required_var = NULL) {
   model_options <- dssat_infer_model_options(model_options)
   paths <- dssat_companion_paths(model_options)

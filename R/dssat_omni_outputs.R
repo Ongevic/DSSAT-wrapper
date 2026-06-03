@@ -1,3 +1,18 @@
+# ===========================================================================
+# dssat_omni_outputs.R  —  PARSE STAGE  (see ARCHITECTURE.md)
+# Author: Victor Nyabuti Ong'era
+#
+# Turns DSSAT's raw output (PlantGro.OUT etc.) into the tidy column the caller
+# asked for. The key idea is the ALIAS MAP: a friendly name like "biomass" or
+# "yield" maps to the real DSSAT column code, which differs by family
+# (e.g. biomass = CWAD for most crops, but CWAM/SHTD for SUGARCANE). Functions:
+#   - dssat_add_stage_columns()      : add Zadok growth-stage day columns
+#   - dssat_variable_alias_map()     : friendly-name -> family-specific columns
+#   - dssat_resolve_requested_vars() : pick the actual column for the request
+# To support a new variable or a family-specific column, edit the alias map.
+# ===========================================================================
+# Add Zadok growth-stage columns (e.g. Zadok65) giving the day-of-year each
+# stage was reached. Only acts if a growth-stage column (GSTD) is present.
 dssat_add_stage_columns <- function(pgro) {
   if (!("GSTD" %in% names(pgro)) || nrow(pgro) == 0) {
     return(pgro)
@@ -15,6 +30,9 @@ dssat_add_stage_columns <- function(pgro) {
   pgro
 }
 
+# THE ALIAS MAP: translate a friendly name (biomass, lai, yield, …) into the
+# real DSSAT column code(s), which differ by family. Start from common aliases,
+# then override per adapter. EDIT HERE to add a variable or fix a family's column.
 dssat_variable_alias_map <- function(adapter) {
   common_aliases <- list(
     biomass = c("CWAD", "TWAD", "CWAM"),
@@ -43,6 +61,9 @@ dssat_variable_alias_map <- function(adapter) {
   utils::modifyList(common_aliases, adapter_aliases)
 }
 
+# Given the parsed output and the variable(s) the caller asked for, return the
+# actual columns present — accepting either a real DSSAT code (e.g. CWAD) or a
+# friendly alias (e.g. biomass) resolved via the alias map above.
 dssat_resolve_requested_vars <- function(pgro, requested_vars, adapter) {
   if (is.null(requested_vars)) {
     return(pgro)
@@ -76,6 +97,9 @@ dssat_resolve_requested_vars <- function(pgro, requested_vars, adapter) {
   dplyr::select(pgro, dplyr::all_of(resolved))
 }
 
+# Top-level PARSE entry: read the family's OUT files from the run directory,
+# add stage columns, resolve the requested variable, and return a tidy
+# per-situation list of Date + variable data frames.
 dssat_read_outputs_generic <- function(project_path, model_options, situation_names = NULL, trt_numbers = NULL, var = NULL) {
   pgro_path <- file.path(project_path, "PlantGro.OUT")
   if (!file.exists(pgro_path)) {

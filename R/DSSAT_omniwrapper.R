@@ -1,9 +1,15 @@
 #' @title Registry-Driven DSSAT Omniwrapper
+#' @author Victor Nyabuti Ong'era
 #'
 #' @description
 #' Public entry point for the multi-family DSSAT wrapper. This file keeps the
 #' user-facing API small and readable by sourcing the internal helper modules
 #' that handle registry discovery, output parsing, and run orchestration.
+#'
+#' SOURCE THIS ONE FILE to load everything:
+#'   source("R/DSSAT_omniwrapper.R")
+#' It pulls in the registry (resolve), run, and outputs (parse) helpers.
+#' See ARCHITECTURE.md for the resolve -> run -> parse flow.
 
 dssat_omni_this_file <- function() {
   for (frame_index in rev(seq_len(sys.nframe()))) {
