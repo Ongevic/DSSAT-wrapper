@@ -6,4 +6,5 @@
 * [Your First Run](first-run.md)
 * [Self-Check and Validation](self-check-and-validation.md)
 * [Supported Families](supported-families.md)
+* [Architecture (for developers)](architecture.md)
 * [Attribution and Disclaimer](attribution-and-license.md)

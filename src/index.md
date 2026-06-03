@@ -37,5 +37,6 @@ result <- DSSAT_omniwrapper(
 )
 ```
 
-Developers who want to understand or extend the code should read
-`ARCHITECTURE.md` in the repository root (the resolve → run → parse design).
+Developers who want to understand or extend the code should read the
+[Architecture (for developers)](architecture.md) page (the resolve → run → parse
+design).

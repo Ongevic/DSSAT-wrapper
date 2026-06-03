@@ -120,8 +120,8 @@ The repository includes a focused `mdBook` guide in `src/`, covering:
 - supported families
 - attribution and disclaimer
 
-For developers, `ARCHITECTURE.md` explains how the code is organised
-(resolve → run → parse) and where to make common changes.
+For developers, the **Architecture** page (`src/architecture.md`) explains how
+the code is organised (resolve → run → parse) and where to make common changes.
 
 ## Attribution
 
