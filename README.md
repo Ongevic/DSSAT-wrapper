@@ -22,32 +22,19 @@ reproducible wrapper workflows.
   project directories
 - a focused `mdBook` guide for setup, validation, and contribution
 
-## Current validated families
+## Validated families
 
-Validated through `DSSAT_omniwrapper()`:
+`DSSAT_omniwrapper()` has been validated across all the standard DSSAT 4.8 crop
+families — CERES, CROPGRO, CROPSIM, FORAGE, SUGARCANE (CANEGRO/CASUPRO/SAMUCA),
+RICE, SUBSTOR, ALOHA, AROIDS, CSYCA, NWHEAT, OILCROP and CERES-IXIM — by running
+a shipped example for every crop in a local DSSAT install.
 
-- `ALOHA`
-- `AROIDS`
-- `CANEGRO`
-- `CASUPRO`
-- `CERES`
-- `CERES-IXIM`
-- `CROPGRO`
-- `CROPSIM`
-- `CSYCA`
-- `NWHEAT`
-- `OILCROP`
-- `SAMUCA`
-- `SUBSTOR`
+The one current exception is **`CSCAS`** (older cassava model): it launches but
+DSSAT's own executable stops with a model/data error, so use `CSYCA` for cassava.
 
-Known blocker:
-
-- `CSCAS` currently launches through the wrapper but still stops inside DSSAT
-  with an ecotype-related model or data issue in the tested setup.
-
-Next unresolved family:
-
-- `FORAGE`
+The full crop-by-crop table, with the example used and row counts, lives in the
+guide so there is a single source of truth:
+[Supported Families](src/supported-families.md).
 
 ## What this repository does not include
 
@@ -124,20 +111,17 @@ If `DSSAT_PATH` is not set, the scripts try the common Windows default
 
 ## Documentation
 
-The repository includes a focused `mdBook` in `src/`, covering:
+The repository includes a focused `mdBook` guide in `src/`, covering:
 
-- repository structure
-- DSSAT file anatomy
 - setup from an installed DSSAT folder
 - setup with GitHub-sourced example data
-- first runs and self-checks
-- wrapper design and code walkthroughs
+- your first run
+- self-check and validation
 - supported families
-- a hemp paper case study
-- troubleshooting and extension guidance
+- attribution and disclaimer
 
-If GitHub Pages is enabled for the repository, the book can be published from
-the included workflow.
+For developers, `ARCHITECTURE.md` explains how the code is organised
+(resolve → run → parse) and where to make common changes.
 
 ## Attribution
 
